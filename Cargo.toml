@@ -2,3 +2,5 @@
 name = "engine_rs"
 version = "0.1.0"
 edition = "2021"
+[dependencies]
+smallvec = "1.13"

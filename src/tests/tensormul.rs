@@ -1,5 +1,4 @@
 #[cfg(test)]
-mod tests {
     use crate::{ops::tensor_mul, tensor::Tensor};
 
     fn t_seq(shape: &[usize]) -> Tensor {
@@ -141,4 +140,100 @@ mod tests {
         let b = t_seq(&[2, 1, 3, 2]);
         assert_batched_matmul_ok(&a, &b);
     }
+
+#[cfg(test)]
+
+
+
+    // Copie du helper de vérification : même logique que tes tests existants
+
+
+
+
+#[test]
+fn big_batch_small_mnk() {
+    // Beaucoup de batch, petites matrices (3x2) x (2x4) -> (3x4)
+    let a = t_seq(&[7, 6, 1, 3, 2]);
+    let b = t_seq(&[1, 6, 1, 2, 4]);
+    assert_batched_matmul_ok(&a, &b);
+}
+
+#[test]
+fn two_batch_dims_moderately_large_mnk() {
+    // (10x11) x (11x12) avec deux dims de batch
+    let a = t_seq(&[8, 9, 10, 11]);
+    let b = t_seq(&[8, 9, 11, 12]);
+    assert_batched_matmul_ok(&a, &b);
+}
+
+#[test]
+fn broadcast_on_lhs_many_dims() {
+    // LHS broadcasté sur plusieurs dims -> sortie [2,3,8,5]
+    let a = t_seq(&[1, 1, 8, 16]);
+    let b = t_seq(&[2, 3, 16, 5]);
+    assert_batched_matmul_ok(&a, &b);
+}
+
+#[test]
+fn broadcast_on_rhs_many_dims() {
+    // RHS broadcasté -> sortie [2,3,32,7]
+    let a = t_seq(&[2, 3, 32, 64]);
+    let b = t_seq(&[1, 1, 64, 7]);
+    assert_batched_matmul_ok(&a, &b);
+}
+
+#[test]
+fn deep_rank_mixed_broadcast() {
+    // Rang 6 vs rang 4 (après padding), mix de dims {=,1} compatibles
+    // A[..., 5, 7] x B[..., 7, 8] -> out[..., 5, 8]
+    let a = t_seq(&[2, 3, 1, 4, 5, 7]);
+    let b = t_seq(&[3, 1, 7, 8]); // pad -> [1,1,3,1,7,8]
+    assert_batched_matmul_ok(&a, &b);
+}
+
+#[test]
+fn k_equals_one_path() {
+    // Chemin "k=1" (utile pour tester les strides zéro internes)
+    // (5x1) x (1x9) -> (5x9) avec batch [2,3,4]
+    let a = t_seq(&[2, 3, 4, 5, 1]);
+    let b = t_seq(&[1, 1, 1, 1, 9]);
+    assert_batched_matmul_ok(&a, &b);
+}
+
+#[test]
+fn multi_batch_with_partial_broadcast() {
+    // Mélange d'égalité et de 1 dans le broadcast
+    // (2x9) x (9x13) -> (2x13), batch [5,4,7] vs [1,4,1] => out [5,4,7]
+    let a = t_seq(&[5, 4, 7, 2, 9]);
+    let b = t_seq(&[1, 4, 1, 9, 13]);
+    assert_batched_matmul_ok(&a, &b);
+}
+
+#[test]
+fn medium_dense_mnk_three_batch_dims() {
+    // (6x8) x (8x6) -> (6x6), batch [3,2,4]
+    let a = t_seq(&[3, 2, 4, 6, 8]);
+    let b = t_seq(&[3, 2, 4, 8, 6]);
+    assert_batched_matmul_ok(&a, &b);
+}
+
+// ---- Cas d'erreurs attendues ----
+
+#[test]
+#[should_panic]
+fn panic_on_mismatched_k() {
+    // k incompatible: A[..., m, **3**] vs B[..., **4**, n]
+    let a = t_seq(&[2, 5, 3]);
+    let b = t_seq(&[2, 4, 4]);
+    let _ = tensor_mul(&a, &b);
+}
+
+#[test]
+#[should_panic]
+fn panic_on_incompatible_broadcast() {
+    // Broadcast impossible sur batch: [2,3] vs [4,4]
+    // (4x5) x (5x6) ok sur les 2 dernières dims, mais batch échoue
+    let a = t_seq(&[2, 3, 4, 5]);
+    let b = t_seq(&[4, 4, 5, 6]);
+    let _ = tensor_mul(&a, &b);
 }

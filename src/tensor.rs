@@ -1,17 +1,19 @@
 use std::ops::{Add, Mul};
 use std::sync::Arc;
 use std::iter; 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tensor {
     pub data: Arc<Vec<f32>>,
     pub shape : Vec<usize>, 
     pub strides : Vec<usize>, 
     pub offset : usize,
 }
-
+// TODO: remove les new innecessaires car problemes de recalcul de strides . eviter de recalculer les strides sauf a la vraie creation du tenseur initial.
+// TODO: ajouter un DeviceType et un DataType
 
 impl Tensor{
 
+    // initialisations
     pub fn new(data: Arc<Vec<f32>>, shape :&[usize], offset: usize) -> Tensor{
         Tensor{
             data, 
@@ -69,7 +71,7 @@ impl Tensor{
 
 
 
-
+    // changements de vues, transformations
 
     #[inline(always)]
     pub fn is_broadcasted(&self) -> bool {
@@ -84,6 +86,7 @@ impl Tensor{
     pub fn squeeze_view(& self, axis: usize) ->Tensor{ // TODO : jouter l'axis negatif
         let mut new_shape = self.shape.clone(); 
         new_shape.remove(axis);
+        
 
         Tensor::new(self.data.clone(), &new_shape, self.offset)
     }
@@ -112,7 +115,6 @@ impl Tensor{
        Ok(res)
         
     }
-
     // gives the needed shape for the two tensors
     pub fn broadcast_shape(a: &[usize], b: &[usize]) -> Result<Vec<usize>, String>{
         let n = a.len().max(b.len());
@@ -137,12 +139,27 @@ impl Tensor{
         Ok(res)
 
     }
-
     pub fn vue2d(&self, offset: usize) -> Tensor{
         let dim = self.shape.len();
         Tensor { data: self.data.clone(), shape: self.shape[(dim-2)..dim].to_vec(), strides: self.strides[(dim-2)..dim].to_vec(), offset: offset }
     }
+    pub fn mat_transpose(&self) -> Tensor{
+        let dim = self.shape.len();
+        if dim == 1{
+            self.clone()
+        }else{
+            let mut new_shape = self.shape.clone(); 
+            let mut new_strides = self.strides.clone();
+            new_shape.swap(dim-1, dim-2);
+            new_strides.swap(dim-1, dim-2);
+            Tensor { data: self.data.clone(), shape: new_shape.clone(), strides: new_strides, offset: self.offset }
+        }
 
+    }
+
+
+
+    // conversion index, prise d'éléments, ... /!\ remove set2, inutile je pense..
     #[inline(always)] // pour la rapitidité
     pub fn get2(&self, i: usize, j: usize) -> f32 {
         self.data[self.offset + self.strides[0]*i + self.strides[1]*j]
@@ -159,32 +176,84 @@ impl Tensor{
         self.data[idx+self.offset]
     }
     #[inline(always)]
-    pub fn get_from_lin(&self, mut lin: usize) -> f32{
-        let mut idxs = Vec::with_capacity(self.shape.len());
-        for i in (0..(idxs.len())).rev()
-        {
-            if(self.strides[i]!=0){
-                idxs.push(lin%self.strides[i]);
-                lin/=self.strides[i];
-            }
-        }
+    pub fn get_from_lin(&self, lin: usize) -> f32{
+        let idxs = Tensor::idx_from_lin(&self.shape, lin);
         self.get(&idxs)
     }
     pub fn idx_from_lin(shape: &[usize], mut lin: usize) -> Vec<usize>{
-        let mut idxs = Vec::with_capacity(shape.len());
-        for i in (0..(shape.len())).rev()
-        {
-            if(shape[i]!=0){
-                idxs.push(lin%shape[i]);
-                lin/=shape[i];
+
+        let mut idxs: Vec<usize> = shape.iter().rev().map(|&sa|
+            if sa!=0 {
+                let idx = lin%sa;
+                lin/=sa;
+                idx
+            }else{
+                 0
             }
-        }
+        ).collect();
+  
         // attention a ca ! +
         idxs.reverse();
         idxs
     }
     pub fn batch_offset(&self, idx: &[usize]) -> usize{
         idx.iter().zip(self.strides.iter()).map(|(&sh, &st)| sh*st).sum()
+    }
+
+
+    /*
+
+    Yb = A_b B  <= b un batch. Pour un tenseur, le nombre de batches c'est la somme des nouvelles shapes ayant été redimensionnées (broadcastées) (uniquement pour lobjet qu(on manipule))
+
+           v--chain rule + def gradiant
+    dL = sum <Gb, dYb> = sum <Gb dAb B + A_b dB>
+       = sum <Gb, dAb B > + <Gb, A_b dB>
+       = sum <Gb  B ^T , dAb> + <A_b ^T Gb, dB>
+
+            ^GRADIANT Ab           ^ GRADIANT dB
+        
+
+     */
+    pub fn squeeze_first(&self, val:usize)->Tensor{
+        let mut new_strides = self.strides.clone();
+        let mut new_shape = self.shape.clone();
+        for _ in 0..val{
+            new_strides.remove(0);
+            new_shape.remove(0);
+        }
+        Tensor{data:self.data.clone(), shape:new_shape, strides:new_strides, offset:self.offset}
+    }
+    pub fn sum_over_broadcasted_batches(&self, parent_shape : &[usize]) -> Tensor{
+        let len_diff = self.shape.len()- parent_shape.len();
+        let parent_upd_shape = [vec![len_diff; 1], parent_shape.to_vec()].concat();
+        let n = parent_upd_shape.len();
+        let mut new_shape = vec![n;0];
+        let mut new_strides = vec![n; 0];
+        let mut acc = 0; 
+        for i in 0..n{
+            if parent_upd_shape[i] == 1 && self.shape[i] != 1{ // en ca a été broadcasté..
+                acc+=1;
+                new_shape[i] = 1; 
+                new_strides[i]=1;
+            }else{
+                new_strides[i]= self.strides[i];
+                new_shape[i]=self.shape[i];
+            } 
+        }
+        let temp = Tensor { data: self.data.clone(), shape: new_shape, strides: new_strides, offset: self.offset };
+        temp.apply(|x| x*(acc as f32)).squeeze_first(len_diff)
+    }
+
+
+
+    // fonction generique
+    pub fn apply<F>(&self, f : F)-> Tensor
+    where F : Fn(f32) -> f32
+    {
+        
+        let new_values = Arc::new(self.data.iter().map(|&x| f(x)).collect());
+        Tensor { data: new_values, shape: self.shape.clone(), strides: self.strides.clone(), offset: self.offset }
+        
     }
 }
 
@@ -219,6 +288,7 @@ impl Numel for Vec<usize>{
 
 use std::fmt;
 
+
 impl fmt::Display for Tensor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Tensor(")?;
@@ -226,42 +296,86 @@ impl fmt::Display for Tensor {
         writeln!(f, "  strides: {:?},", self.strides)?;
         writeln!(f, "  offset: {},", self.offset)?;
 
-        match self.shape.len() {
-            0 => writeln!(f, "  data: []")?,
-            1 => {
-                // vecteur
-                let n = self.shape[0];
-                let vals: Vec<String> = self.data[..n]
-                    .iter()
-                    .map(|x| format!("{:.4}", x))
-                    .collect();
-                writeln!(f, "  data: [{}]", vals.join(", "))?;
-            }
-            2 => {
-                // matrice 2D
-                let (rows, cols) = (self.shape[0], self.shape[1]);
-                writeln!(f, "  data: [")?;
-                for i in 0..rows {
-                    let start = i * cols;
-                    let end = start + cols;
-                    let vals: Vec<String> = self.data[start..end]
-                        .iter()
-                        .map(|x| format!("{:8.4}", x))
-                        .collect();
-                    writeln!(f, "    [{}],", vals.join(", "))?;
+        // Gestion des tenseurs vides (au moins une dim = 0)
+        if self.shape.iter().any(|&d| d == 0) {
+            writeln!(f, "  data: []")?;
+            return write!(f, ")");
+        }
+
+        let rank = self.shape.len();
+
+        // Scalar (0D)
+        if rank == 0 {
+            // offset pointe sur l'élément
+            let v = self.data[self.offset];
+            writeln!(f, "  data: {:.4}", v)?;
+            return write!(f, ")");
+        }
+
+        // Petite fonction d'indentation
+        #[inline]
+        fn indent(f: &mut fmt::Formatter<'_>, n: usize) -> fmt::Result {
+            for _ in 0..n { write!(f, " ")?; }
+            Ok(())
+        }
+
+        // Impression récursive d'un N-D array en respectant strides/offset.
+        fn fmt_rec(
+            t: &Tensor,
+            f: &mut fmt::Formatter<'_>,
+            dim: usize,
+            idx: &mut [usize],
+            base_indent: usize, // indentation de départ (par ex. 2)
+        ) -> fmt::Result {
+            let rank = t.shape.len();
+
+            if dim + 1 == rank {
+                // Dernière dimension : on imprime une "ligne" 1D alignée.
+                write!(f, "[")?;
+                for i in 0..t.shape[dim] {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    idx[dim] = i;
+                    let v = t.get(idx);
+                    write!(f, "{:8.4}", v)?;
                 }
-                writeln!(f, "  ]")?;
+                write!(f, "]")?;
+                Ok(())
+            } else {
+                // Dimensions supérieures : on ouvre un bloc, puis chaque sous-tranche sur une nouvelle ligne.
+                write!(f, "[")?;
+                for i in 0..t.shape[dim] {
+                    if i > 0 {
+                        write!(f, ",")?;
+                    }
+                    writeln!(f)?;
+                    indent(f, base_indent + 2)?;
+                    idx[dim] = i;
+                    fmt_rec(t, f, dim + 1, idx, base_indent + 2)?;
+                }
+                writeln!(f)?;
+                indent(f, base_indent)?;
+                write!(f, "]")?;
+                Ok(())
             }
-            _ => {
-                let preview = 10.min(self.data.len());
-                writeln!(
-                    f,
-                    "  data: {:?} ... ({} éléments, dim>{})",
-                    &self.data[..preview],
-                    self.data.len(),
-                    self.shape.len()
-                )?;
-            }
+        }
+
+        // Cas 1D/2D bénéficient du même moteur mais on garde l’en-tête "data:" + jolie mise en page.
+        write!(f, "  data: ")?;
+        let mut idx = vec![0usize; rank];
+        if rank == 1 {
+            // Simple ligne
+            fmt_rec(self, f, 0, &mut idx, 2)?;
+            writeln!(f)?;
+        } else if rank == 2 {
+            // Matrice : chaque ligne sur sa propre ligne déjà géré par fmt_rec
+            fmt_rec(self, f, 0, &mut idx, 2)?;
+            writeln!(f)?;
+        } else {
+            // N-D : idem, avec indentations
+            fmt_rec(self, f, 0, &mut idx, 2)?;
+            writeln!(f)?;
         }
 
         write!(f, ")")
