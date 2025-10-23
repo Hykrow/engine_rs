@@ -82,7 +82,9 @@ impl Tensor{
 
         Tensor::new(self.data.clone(), &new_shape, self.offset)
     }
-    pub fn broadcast_view()
+    pub fn broadcast_view() -> Tensor{
+        
+    }
 
     #[inline(always)] // pour la rapitidité
     pub fn get2(&self, i: usize, j: usize) -> f32 {
