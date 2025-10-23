@@ -28,9 +28,13 @@ cargo run
 
 N'hésitez pas si vous avez des corrections !
 
-## Références
+## Références et détails d'implémentation
 
-- Pour le calcul des gradients, j'ai énormément apprécié le blog de Robot Chinwag : https://robotchinwag.com/posts/the-tensor-calculus-you-need-for-deep-learning/ ceci m'a permis de programmer les différentes opérations sur les Tenseurs. 
+# Calcul de gradients, Tenseurs
+- Pour le calcul des gradients, j'ai énormément apprécié le blog de Robot Chinwag : https://robotchinwag.com/posts/the-tensor-calculus-you-need-for-deep-learning/ ceci m'a permis de programmer les différentes opérations sur les Tenseurs.  
  
+- Pour comprendre le broadcast, https://numpy.org/doc/stable/user/basics.broadcasting.html est une bonne ressource.
 
+# Moteur en lui-même. 
 - Pour comprendre comment le moteur fonctionne dans son essence, la vidéo d'Andrej Kaparthy est très facile d'accès et complète: "RAJOUTER LIEN"
+- Note: j'aimerais bien implémenter une version JIT si j'ai le temps...
