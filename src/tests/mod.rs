@@ -13,3 +13,7 @@ mod tensoradd;
 
 #[cfg(test)]
 mod backward;
+
+
+#[cfg(test)]
+mod sum_on_broadcast;

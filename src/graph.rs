@@ -5,10 +5,18 @@ use smallvec::SmallVec;
 pub struct NodeId(pub usize); 
 
 
-struct Node{
-    op: Op, 
-    parents: SmallVec<[NodeId; 2]>,
-    tensor: Tensor
+
+
+pub enum Node{
+    Leaf{
+        tensor : Tensor, 
+        requires_grad: bool
+    },
+    InternalNode{
+        op: Op, 
+        parents: SmallVec<[NodeId; 2]>,
+        tensor: Tensor
+    }
 }
 
 pub struct Graph{
@@ -16,13 +24,19 @@ pub struct Graph{
 }
 
 impl Graph{
+
     #[inline]
-    fn push(&mut self, op: Op, parents: SmallVec<[NodeId; 2]>, tensor: Tensor) -> NodeId {
+    pub fn push(&mut self, node: Node) -> NodeId {
         let id = NodeId(self.nodes.len());
-        self.nodes.push(Node { op, parents, tensor });
+        self.nodes.push(node);
         id
     }
+    /*sets requires_grad to false since just an input */
     pub fn input(& mut self, t: Tensor) -> NodeId{
-        self.push(Op::Leaf, SmallVec::new(), t)
+        self.push(Node::Leaf{tensor: t, requires_grad: false})
+    }
+    pub fn param(&mut self, t: Tensor) -> NodeId{
+        self.push(Node::Leaf { tensor: t, requires_grad: true })
     }
 }
+    

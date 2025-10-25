@@ -8,8 +8,7 @@ pub enum Op {
     Add,
     MatMul, // two last shapes
     Tanh,
-    ReLU,
-    Leaf
+    ReLU
 }
 
 
@@ -17,12 +16,11 @@ pub enum Op {
 impl Op{
     pub fn forward(&self, parents : &[&Tensor]) -> Tensor{
         match self{
-            Op::Add => add(parents[0], parents[1]),
+            Op::Add => parents[0] + parents[1],
             Op::MatMul => tensor_mul(parents[0], parents[1]),
             Op::Tanh => parents[0].apply(f32::tanh),
-            Op::ReLU=> parents[0].apply(|x| x.max(0f32))
-            
-
+            Op::ReLU => parents[0].apply(|x| x.max(0f32)),
+ 
         }
 
     }
@@ -34,29 +32,22 @@ impl Op{
 
         match self{
             Op::Add =>{
-                let shape = &tensor.shape;
-                let new_grad = before_grad.broadcast_view(shape).unwrap();
-                
-                vec![new_grad.clone(), new_grad.clone()] // a check si on peut faire sans clone. En vrai on modifiie jamais before_grad..
+                 
+                vec![before_grad.sum_over_broadcasted_batches(&parents[0].shape), before_grad.sum_over_broadcasted_batches(&parents[1].shape)] // a check si on peut faire sans clone. En vrai on modifiie jamais before_grad..
             }, 
             Op::MatMul =>{
                 println!("Matrice a: {}, \n, Matrice b {} , \n BEFORE GRAD:  {}", parents[0], parents[1], before_grad);
 
-                let grad_left = tensor_mul(before_grad, &parents[1].mat_transpose()).sum_over_broadcasted_batches(&parents[1].shape);
-                let grad_right = tensor_mul(&parents[0].mat_transpose(), &before_grad).sum_over_broadcasted_batches(&parents[0].shape);
+                let grad_left = tensor_mul(before_grad, &parents[1].mat_transpose()).sum_over_broadcasted_batches(&parents[0].shape);
+                let grad_right = tensor_mul(&parents[0].mat_transpose(), &before_grad).sum_over_broadcasted_batches(&parents[1].shape);
                 vec![grad_left, grad_right]
             }, 
             Op::Tanh=>{
-                /*
-                sur ce tenosr : y = Tanh(x)
-                pour x : dL/dx = DL/dy<-gradient quon prend en argument * dy/dx <- derivée tanh.
-                Mais la c'est pas des scalaires c'est: 
-                DL/
-                 */
-                vec![tensor_mul(before_grad, &tensor.apply(|y| 1f32- y*y).mat_transpose())] // a verifier si y correspond bien a la version appliquée , soit y = tanh(x)
+     
+                vec![hadamard_mul(&tensor.apply(|y| 1f32-y*y), before_grad)] 
             }, 
             Op::ReLU=>{
-                vec![tensor.apply(|y| if y > 1f32 {1f32} else {0f32})]
+                vec![hadamard_mul(&tensor.apply(|y| if y > 0f32 {1f32} else {0f32}), before_grad)]
             }
 
         }
@@ -66,19 +57,30 @@ impl Op{
 
 
 
+impl Add for &Tensor{
+    type Output = Tensor;
+    fn add(self, b: &Tensor) -> Tensor{
 
-pub fn add(a : &Tensor, b: &Tensor) -> Tensor{
-    let sz = a.numel();
-    let mut vec = Vec::with_capacity(sz);
-    let broadcast_shape = Tensor::broadcast_shape(&b.shape, &b.shape).unwrap();
-    let a_b = a.broadcast_view(&broadcast_shape).unwrap();
-    let b_b = b.broadcast_view(&broadcast_shape).unwrap();
-    for lin in 0..sz{
-        vec.push(a_b.get_from_lin(lin)+ b_b.get_from_lin(lin));
+        let broadcast_shape = Tensor::broadcast_shape(&self.shape, &b.shape).unwrap();
+
         
+        
+        let sz = broadcast_shape.numel();
+        let mut vec = Vec::with_capacity(sz);       
+        let a_b = self.broadcast_view(&broadcast_shape).unwrap();
+        let b_b = b.broadcast_view(&broadcast_shape).unwrap();
+
+
+       // println!("shape vers qui broadcast : {:?} \n, a_b: {}\n, b_b : {},\n a: {a}")
+        for lin in 0..sz{
+            vec.push(a_b.get_from_lin(lin)+ b_b.get_from_lin(lin));
+            
+        }
+        Tensor { data: Arc::new(vec), shape: broadcast_shape, strides: a_b.strides, offset: 0 }
     }
-    Tensor { data: Arc::new(vec), shape: broadcast_shape, strides: a_b.strides, offset: 0 }
 }
+
+
 
 
 
@@ -213,3 +215,13 @@ pub fn add(a : &Tensor, b: &Tensor) -> Tensor{
     }
 
 
+
+//TODO : vérifier si on devrait faire du broadcast aussi
+pub fn hadamard_mul(a: &Tensor, b: &Tensor ) -> Tensor{
+    assert_eq!(&a.shape, &b.shape, "les shapes ne sont pas compatible spour le hadamard mul");
+    let mut c = Vec::with_capacity(a.shape.numel());
+    for lin in 0..a.shape.numel(){
+        c.push(a.get_from_lin(lin)*b.get_from_lin(lin));
+    }
+    Tensor::new(Arc::new(c), &a.shape, 0)
+}

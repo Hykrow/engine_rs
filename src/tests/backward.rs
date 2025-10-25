@@ -315,4 +315,3 @@
         assert_tensor_close(ga, &exp_ga, 1e-6);
         assert_tensor_close(gb, &exp_gb, 1e-6);
     }
-    

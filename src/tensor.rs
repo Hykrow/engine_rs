@@ -196,10 +196,24 @@ impl Tensor{
         idxs.reverse();
         idxs
     }
+    pub fn lin_from_idx(&self, id: &[usize])-> usize{
+        let idx = id.iter().zip(self.strides.iter()).map(|(&a, &b)| a*b).sum::<usize>();
+        idx
+    }
     pub fn batch_offset(&self, idx: &[usize]) -> usize{
         idx.iter().zip(self.strides.iter()).map(|(&sh, &st)| sh*st).sum()
     }
 
+
+    pub fn squeeze_first(&self, val:usize)->Tensor{
+        let mut new_strides = self.strides.clone();
+        let mut new_shape = self.shape.clone();
+        for _ in 0..val{
+            new_strides.remove(0);
+            new_shape.remove(0);
+        }
+        Tensor{data:self.data.clone(), shape:new_shape, strides:new_strides, offset:self.offset}
+    }
 
     /*
 
@@ -213,35 +227,70 @@ impl Tensor{
             ^GRADIANT Ab           ^ GRADIANT dB
         
 
-     */
-    pub fn squeeze_first(&self, val:usize)->Tensor{
-        let mut new_strides = self.strides.clone();
-        let mut new_shape = self.shape.clone();
-        for _ in 0..val{
-            new_strides.remove(0);
-            new_shape.remove(0);
-        }
-        Tensor{data:self.data.clone(), shape:new_shape, strides:new_strides, offset:self.offset}
-    }
-    pub fn sum_over_broadcasted_batches(&self, parent_shape : &[usize]) -> Tensor{
-        let len_diff = self.shape.len()- parent_shape.len();
-        let parent_upd_shape = [vec![len_diff; 1], parent_shape.to_vec()].concat();
-        let n = parent_upd_shape.len();
-        let mut new_shape = vec![n;0];
-        let mut new_strides = vec![n; 0];
-        let mut acc = 0; 
+     */ 
+    pub fn sum_over_broadcasted_batches(&self, origin_shape : &[usize]) -> Tensor{
+
+
+
+
+        println!("Tenseur d'origine : {}, shape à rematch : {:?}", self, origin_shape);
+        let len_diff = self.shape.len()- origin_shape.len();
+        let origin_shape_upd = [vec![1; len_diff], origin_shape.to_vec()].concat();
+        let n = origin_shape_upd.len();
+        let mut to_sum = vec![false; n];
+        
+        let mut new_shape = Vec::new();
         for i in 0..n{
-            if parent_upd_shape[i] == 1 && self.shape[i] != 1{ // en ca a été broadcasté..
-                acc+=1;
-                new_shape[i] = 1; 
-                new_strides[i]=1;
+            if origin_shape_upd[i] == 1 { 
+                to_sum[i] = true;
+                
+                new_shape.push(1);// rechopper 1. 
             }else{
-                new_strides[i]= self.strides[i];
-                new_shape[i]=self.shape[i];
-            } 
+                new_shape.push(origin_shape_upd[i]);
+            }
         }
-        let temp = Tensor { data: self.data.clone(), shape: new_shape, strides: new_strides, offset: self.offset };
-        temp.apply(|x| x*(acc as f32)).squeeze_first(len_diff)
+        
+        // calculer la nouvelle shape
+
+        // mtn, on a les axes sur lesquels sommer.
+        
+        // il faut ensuite iterer sur chaque indice. quand on a un indice, on check lesquels fais : 
+        /*
+        faire une nouvelle shape avec les truc en moins -> fait
+        nommons old_idx obtenu avec notre boucle for
+        pour chauque dimension i : 
+            ->si to_sum[i] vaut true, retirer ca de l'idx
+        convertir le nouveaux idx en lin en passant en argument la nouvelle shape
+        rajouter à vec[lin] self.value(old_idx)
+
+         */
+        //TODO: ajouter un truc pour check si ca a du sens  de faire ca dessus
+        let mut new_data= vec![0f32; new_shape.numel()]; 
+        let new_strides = Tensor::compute_strides(&new_shape);
+        for lin in 0..(self.shape.numel()){
+            let old_idx = Tensor::idx_from_lin(&self.shape, lin);
+            let mut new_idx = Vec::new();
+            for i in 0..n{
+                if to_sum[i] == true{
+                    new_idx.push(0);
+                }else{
+                    new_idx.push(old_idx[i]);
+                }
+            }
+            let new_lin : usize= new_idx.iter().zip(new_strides.iter()).map(|(&sa, &st)| sa*st).sum();
+            new_data[new_lin]+= self.get(&old_idx); // en vrai, vrm pas sur de ca. jsp si on a besoin de old idx et de new idx; et enocre moin de to_sum.. car je pens eque tt se fait automatiquement aec les strides
+
+        }
+
+        let t = Tensor{
+            data:Arc::new(new_data), 
+            shape: new_shape.clone(), 
+            strides: Tensor::compute_strides(&new_shape), 
+            offset: 0
+        }.squeeze_first(len_diff); 
+        println!("Tenseur transformé et sommé : {}", t);
+        t
+
     }
 
 
@@ -259,17 +308,6 @@ impl Tensor{
 
 pub trait Numel {
     fn numel(&self) -> usize;
-}
-
-impl Numel for Tensor {
-    fn numel(&self) -> usize {
-        self.shape.iter().zip(self.strides.iter()).map(|(&sa, &st)|
-    if st == 0 {
-        1
-    }else{
-       sa
-    }).product() 
-    }
 }
 
 impl Numel for [usize] {

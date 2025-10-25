@@ -160,11 +160,3 @@
         let _ = &a + &b;
     }
 
-    #[test]
-    #[should_panic]
-    fn add_broadcastable_but_not_allowed() {
-        // Même si ce serait broadcastable, ton + actuel exige la même shape
-        let a = t_seq(&[1, 3, 1]);
-        let b = t_seq(&[4, 1, 5]);
-        let _ = &a + &b;
-    }
