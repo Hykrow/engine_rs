@@ -1,6 +1,7 @@
 pub mod tensor;
 pub mod ops;
-pub mod graph;
-
-#[cfg(test)]
-mod tests;
+pub mod trace;
+pub mod autodiff; 
+pub mod optim; 
+pub mod nn;
+pub mod utils; 

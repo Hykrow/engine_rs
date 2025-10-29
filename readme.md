@@ -38,3 +38,7 @@ N'hésitez pas si vous avez des corrections !
 ## Moteur en lui-même. 
 - Pour comprendre comment le moteur fonctionne dans son essence, la vidéo d'Andrej Kaparthy est très facile d'accès et complète: "RAJOUTER LIEN"
 - Note: j'aimerais bien implémenter une version JIT si j'ai le temps...
+
+## Matrix initialization
+
+https://youtu.be/1Rf7BVQ-z0M This video explains very well Xavier and Kaimin initalization. Moreover, I really recommand his other Weight initialization video on the same playlist : https://youtu.be/eoNVmZDnn9w?list=PLJ71tqAZr194By3jyVoG4FvxRZ2rrXD4e
