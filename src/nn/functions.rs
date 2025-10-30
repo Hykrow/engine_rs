@@ -10,7 +10,11 @@ use std::sync::Arc;
 use std::ops::Add;
 use smallvec::smallvec;
 
-pub fn apply(tr: &mut Trace, a_id: NodeId, f_apply: fn(f32) -> f32, f_backwards: fn(f32) -> f32) -> NodeId{
+pub fn apply<F>(tr: &mut Trace, a_id: NodeId, f_apply: F, f_backwards: fn(f32) -> f32) -> NodeId
+    where 
+    F: Fn(f32) -> f32, 
+
+{
     let a= tr.get_tensor(a_id).clone();
     let c = a.apply(f_apply);
     

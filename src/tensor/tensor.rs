@@ -1,3 +1,4 @@
+use core::f32;
 use std::ops::{Add, Mul};
 use std::sync::Arc;
 use std::iter; 
@@ -12,7 +13,7 @@ pub struct Tensor {
 }
 // TODO: remove les new innecessaires car problemes de recalcul de strides . eviter de recalculer les strides sauf a la vraie creation du tenseur initial.
 // TODO: ajouter un DeviceType et un DataType
-
+ //TODO: ajouter un stack / concat pour concatener des shapes. Ex: images => vecteurs. 
 impl Tensor{
 
     // initialisations
@@ -65,6 +66,12 @@ impl Tensor{
         Ok(
             Tensor { data: Arc::new(data.to_vec()), shape: shape.to_vec(), strides: Tensor::compute_strides(shape), offset:0
         })
+    }
+    pub fn flatten_last_nb(&self, last: usize) -> Tensor{
+        unimplemented!()
+    }
+    pub fn flatten_all(&self) -> Tensor{
+        Tensor { data: self.data.clone(), shape:vec![self.shape.numel()],  strides: vec![1], offset: self.offset }
     }
     pub fn from_owned(data: Vec<f32>, shape: &[usize]) -> Result<Self, String> {
         if data.len() != shape.iter().product(){
@@ -352,6 +359,56 @@ impl Tensor{
         Tensor { data: new_values, shape: self.shape.clone(), strides: self.strides.clone(), offset: self.offset }
         
     }
+    // suppose que keepdim = true;
+    pub fn apply_and_reduce_last(&self, f: fn(f32, f32) -> f32, neutral_el: f32) -> Tensor{
+        assert!(self.shape.len() >= 1);
+        
+        let n = self.shape.len();
+        let batches_shape= &self.shape[0..(n-1)];
+        let batches_number = batches_shape.numel();
+        let mut batches = vec![neutral_el; batches_number];
+
+        assert!(self.shape[n-1] > 0);
+        for lin in 0..self.shape.numel(){
+            let x = self.get_from_lin(lin);
+            batches[lin/self.shape[n-1]] = f(batches[lin/self.shape[n-1]], x);
+        }
+        Tensor::from_vec(&batches, batches_shape).unwrap().unsqueeze_view(n-1)
+
+    }
+    // suppose que keepdim = true;
+    pub fn sum_last(&self) -> Tensor{
+        self.apply_and_reduce_last(|x, y| x+y, 0f32)
+    }
+    // suppose que keepdim = true;
+    pub fn max_last(&self) -> Tensor{
+        self.apply_and_reduce_last(|x, y| x.max(y), f32::NEG_INFINITY)
+    }
+
+    //suppose que keepdim = true; 
+    pub fn argmax_last(&self)-> Vec<usize>{
+        assert!(self.shape.len() >= 1);
+        
+        let n = self.shape.len();
+        let batches_shape= &self.shape[0..(n-1)];
+        let batches_number = batches_shape.numel();
+        let mut batches = vec![f32::NEG_INFINITY; batches_number];
+        let mut args = vec![0; batches_number];
+
+        for lin in 0..self.shape.numel(){
+            let x = self.get_from_lin(lin);
+            let new_idx = lin/self.shape[n-1];
+            if batches[new_idx] < x{
+                batches[new_idx] = x; 
+                args[new_idx] = lin%self.shape[n-1];
+            }
+        }
+
+        args
+
+
+    }
+
 }
 
 pub trait Numel {

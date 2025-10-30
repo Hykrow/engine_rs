@@ -1,0 +1,1 @@
+//TODO: ajouter des fonctions collate usuelles ? 

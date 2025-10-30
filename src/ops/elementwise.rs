@@ -5,7 +5,7 @@ use crate::tensor::Numel;
 use crate::trace::{Trace, NodeId, Node};
 use std::result;
 use std::sync::Arc; 
-use std::ops::{Add, Sub};
+use std::ops::{Add, Sub, Div, Mul};
 use smallvec::smallvec;
 
 
@@ -103,6 +103,22 @@ impl Sub for &Tensor{
     fn sub(self, b: &Tensor) -> Tensor{
 
         self+ &b.apply(|x| x*-1f32)
+    }
+}
+
+
+
+impl Div for &Tensor{
+    type Output = Tensor;
+    fn div(self, b: &Tensor) -> Tensor{
+        hadamard_mul_direct(self, &b.apply(|x| 1f32/x))
+    }
+}
+
+impl Mul for &Tensor{
+    type Output = Tensor;
+    fn mul(self, b: &Tensor) -> Tensor{
+        hadamard_mul_direct(self, b)
     }
 }
 

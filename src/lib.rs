@@ -5,3 +5,5 @@ pub mod autodiff;
 pub mod optim; 
 pub mod nn;
 pub mod utils; 
+pub mod dataloader;
+pub mod data_examples;
