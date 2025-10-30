@@ -1,5 +1,4 @@
 use lamp::trace::Trace;
-use lamp::utils;
 use lamp::utils::params::get_params_id;
 use mnist::MnistBuilder;
 use lamp::autodiff::value_and_grad::value_and_grad;
@@ -17,7 +16,7 @@ fn main() {
     let mn = MnistBuilder::new()
         .base_path("data")
         .label_format_digit()
-        .training_set_length(6000)
+        .training_set_length(60_000)
         .test_set_length(500)
         .finalize();
 

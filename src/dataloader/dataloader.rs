@@ -3,12 +3,12 @@ use rand::{seq::SliceRandom, thread_rng};
 pub trait Dataset{
     type Item: Clone;
     fn len(&self) -> usize;
-    fn get(&self, idx: usize) -> Self::Item;  
+    fn get(&mut self, idx: usize) -> Self::Item;  
 }
 pub struct DataLoader<D, C, B>
 where 
     D: Dataset, 
-    C: Fn(Vec<D::Item>) -> B
+    C: FnMut(Vec<D::Item>) -> B
     
 {
     dataset: D,  
@@ -23,7 +23,7 @@ where
 impl <D, C, B> DataLoader<D, C, B>
 where 
     D: Dataset, 
-    C: Fn(Vec<D::Item>) -> B
+    C: FnMut(Vec<D::Item>) -> B
 {
     pub fn new(dataset: D, batch_size: usize, shuffle: bool, collate: C) -> Self{
         let mut indices: Vec<_> = (0..dataset.len()).collect();
@@ -45,7 +45,7 @@ where
 impl <D, C, B> Iterator for DataLoader<D, C, B>
 where
     D: Dataset, 
-    C: Fn(Vec<D::Item>) -> B
+    C: FnMut(Vec<D::Item>) -> B
 {
     type Item = B;
 

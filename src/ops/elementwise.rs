@@ -3,7 +3,6 @@ use smallvec::SmallVec;
 use crate::tensor::Tensor; 
 use crate::tensor::Numel;
 use crate::trace::{Trace, NodeId, Node};
-use std::result;
 use std::sync::Arc; 
 use std::ops::{Add, Sub, Div, Mul};
 use smallvec::smallvec;

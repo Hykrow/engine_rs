@@ -1,13 +1,10 @@
 use smallvec::SmallVec;
 
 use crate::tensor::Tensor; 
-use crate::tensor::Numel;
-use crate::trace::{Trace, NodeId, Node};
+use crate::trace::{Trace, NodeId};
 use crate::ops::hadamard_mul_direct;
 
-use std::result;
-use std::sync::Arc; 
-use std::ops::Add;
+
 use smallvec::smallvec;
 
 pub fn apply<F>(tr: &mut Trace, a_id: NodeId, f_apply: F, f_backwards: fn(f32) -> f32) -> NodeId
@@ -34,3 +31,4 @@ pub fn tanh(tr: &mut Trace, a_id: NodeId) -> NodeId{
 pub fn relu(tr: &mut Trace, a_id: NodeId) -> NodeId{
     apply(tr, a_id, |x| x.max(0f32), |x| if x >= 0f32 {1f32} else{0f32})
 }
+

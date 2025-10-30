@@ -1,5 +1,4 @@
 use core::f32;
-use std::ops::{Add, Mul};
 use std::sync::Arc;
 use std::iter; 
 use rand::Rng; 
@@ -346,8 +345,8 @@ impl Tensor{
 
     }
 
-    pub fn expand_to_shape(&self, shape: &[usize]){
-        
+    pub fn expand_to_shape(&self, shape: &[usize]) -> Tensor{
+        unimplemented!()
     }
 
     // fonction generique
