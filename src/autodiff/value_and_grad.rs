@@ -10,30 +10,17 @@ pub fn value_and_grad(
 
     let mut param_ids = Vec::with_capacity(params.len()); 
 
-    // ca permet d'avoir leur id. 
     for p in params{
         param_ids.push(tr.param(p.clone()));
     }
 
-    println!("params id: {:?} ", param_ids);
 
 
     let loss_id = build(&mut tr, &param_ids);
 
-    println!("successfully built");
     let loss_val = tr.get_tensor(loss_id).clone(); 
 
     let grads = tr.backward_param_grads(loss_id);
 
     (loss_val, grads)
-}
-
-pub fn get_params_id(tr: &mut Trace, params: &[Tensor])-> Vec<usize>{
-    let mut param_ids = Vec::with_capacity(params.len()); 
-
-    // ca permet d'avoir leur id. 
-    for p in params{
-        param_ids.push(tr.param(p.clone()));
-    }
-    param_ids
 }

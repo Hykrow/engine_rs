@@ -12,6 +12,7 @@ use lamp::nn::layers::bind::ParamCursor;
 use lamp::nn::layers::linear::Linear;
 use lamp::nn::losses::softmax_crossentropy;
 use lamp::optim::sgd;
+use lamp::nn::losses::l2_reg;
 
 fn main() {
     let rows = 28; let cols = 28;
@@ -65,7 +66,11 @@ fn main() {
                 let x = tr.input(xb.clone());
                 let y = tr.input(yb.clone());
                 let logits = forward_logits(tr, pids, x);
-                softmax_crossentropy(tr, logits, y) 
+                // si vous voulez juste le softmax: softmax_crossentropy(tr, logits, y) 
+                // sinon , softmaxcrossentropy + reg l2: 
+                let loss = softmax_crossentropy(tr, logit, y);
+                let l2 = l2_reg(tr, 0.0001,pids);
+                add(tr, loss, l2)
             });
 
         println!("loss: {}", loss.data[0]);

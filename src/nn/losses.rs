@@ -77,3 +77,28 @@ pub fn softmax_crossentropy(tr: &mut Trace, logits_id: NodeId, target_id: NodeId
     
     mean_all(tr, smxcpy)
 }
+
+pub fn l2_reg(tr: &mut Trace, lambda: f32, pids_ref: &[usize]) -> NodeId{
+
+    let l2norm: f32 = pids_ref.iter().map(|&id| tr.get_tensor(id).apply(|x|x*x*0.5).sum_all().data[0] ).sum();
+
+    let mut parents_val = Vec::with_capacity(pids_ref.len());
+    for &pid in pids_ref{
+        parents_val.push(tr.get_tensor(pid).clone());
+    }
+
+
+    let vjp = move |g_out: &Tensor| -> SmallVec<[(NodeId, Tensor); 2]>{
+        
+        let mut res : SmallVec <[(NodeId, Tensor); 2]> = SmallVec::with_capacity(parents_val.len());
+        for (pid, tensor) in parents_val.iter().enumerate(){
+            let grad = tensor.apply(|x| x*lambda); 
+            let prod = hadamard_mul_direct(&grad, g_out);
+            res.push((pid,prod));
+        }
+        res
+
+    };
+    tr.push(Node { value: Tensor::from_vec(&[lambda*l2norm], &[]).unwrap()
+        , parents_id: smallvec![], vjp: Some(Box::new(vjp)), is_param: false })
+}

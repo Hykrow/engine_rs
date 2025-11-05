@@ -10,14 +10,33 @@ use lamp::nn::layers::bind::ParamCursor;
 use lamp::nn::layers::linear::Linear;
 use lamp::nn::losses::softmax_crossentropy;
 use lamp::optim::sgd;
+use lamp::ops::add;
+use lamp::nn::losses::l2_reg;
 
 fn main() {
+    /*
+    TODO: regularisation L2, dropout, batchnorm
+    TODO: implé collate checker ca
+    TODO: CNNs
+    TODO: meilleure utilistion dans le main (helper eval & train)
+    TODO: cleanup code (surotut tenseur.rs)
+    TODO: gpu matmul
+    TODO: Adamn
+
+
+    et pour plus tard:
+    TODO: transformers
+
+    bonus: 
+    TODO: faire en sorte que le value du tenseur de soit pas stocké mais fonction only (comme la fonction vjp)
+    TODO: (final) essayer de faire réduction de plusieurs Nodes comme xla (jax)
+     */
     let rows = 28; let cols = 28;
     let mn = MnistBuilder::new()
         .base_path("data")
         .label_format_digit()
-        .training_set_length(60_000)
-        .test_set_length(500)
+        .training_set_length(60_0)
+        .test_set_length(50)
         .finalize();
 
     let ds_train = MnistDataset { imgs: mn.trn_img, labs: mn.trn_lbl, rows, cols };
@@ -28,8 +47,8 @@ fn main() {
     let collate_train = |batch: Vec<(Vec<u8>, u8)>| collate_mnist_xy_u8_to_tensors(batch, rows, cols, 10, true);
     let collate_test  = |batch: Vec<(Vec<u8>, u8)>| collate_mnist_xy_u8_to_tensors(batch, rows, cols, 10, true);
 
-    let mut train = DataLoader::new(ds_train, 10_000, true,  collate_train);
-    let mut test  = DataLoader::new(ds_test,  2_000, false, collate_test);
+    let mut train = DataLoader::new(ds_train, 100, true,  collate_train);
+    let mut test  = DataLoader::new(ds_test,  20, false, collate_test);
 
 
 
@@ -63,7 +82,9 @@ fn main() {
                 let x = tr.input(xb.clone());
                 let y = tr.input(yb.clone());
                 let logits = forward_logits(tr, pids, x);
-                softmax_crossentropy(tr, logits, y) 
+                let loss = softmax_crossentropy(tr, logits, y) ;
+                let l2 = l2_reg(tr, 0.001, pids);
+                add(tr, loss, l2)
             });
 
         println!("loss: {}", loss.data[0]);

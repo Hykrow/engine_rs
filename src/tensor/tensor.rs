@@ -66,9 +66,11 @@ impl Tensor{
             Tensor { data: Arc::new(data.to_vec()), shape: shape.to_vec(), strides: Tensor::compute_strides(shape), offset:0
         })
     }
+    /*
     pub fn flatten_last_nb(&self, last: usize) -> Tensor{
         unimplemented!()
     }
+        */
     pub fn flatten_all(&self) -> Tensor{
         Tensor { data: self.data.clone(), shape:vec![self.shape.numel()],  strides: vec![1], offset: self.offset }
     }
@@ -345,10 +347,11 @@ impl Tensor{
 
     }
 
+    /*
     pub fn expand_to_shape(&self, shape: &[usize]) -> Tensor{
         unimplemented!()
     }
-
+    */
     // fonction generique
     pub fn apply<F>(&self, f : F)-> Tensor
     where F : Fn(f32) -> f32
