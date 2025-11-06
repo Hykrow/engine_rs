@@ -22,7 +22,7 @@ impl Dataset for MnistDataset {
                                                     // Mais, c'est assez bizarre si jamais on shuffle. 
         let img_sz = self.rows * self.cols;
         let off = index * img_sz;
-        let img = self.imgs[off..off+img_sz].to_vec(); // copie: OK pour MNIST
+        let img = self.imgs[off..off+img_sz].to_vec(); 
         let y = self.labs[index];
         (img, y)
     }

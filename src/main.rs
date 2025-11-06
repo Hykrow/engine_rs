@@ -15,7 +15,7 @@ use lamp::nn::losses::l2_reg;
 
 fn main() {
     /*
-    TODO: regularisation L2, dropout, batchnorm
+    TODO: dropout, batchnorm
     TODO: implé collate checker ca
     TODO: CNNs
     TODO: meilleure utilistion dans le main (helper eval & train)
@@ -42,8 +42,7 @@ fn main() {
     let ds_train = MnistDataset { imgs: mn.trn_img, labs: mn.trn_lbl, rows, cols };
     let ds_test  = MnistDataset { imgs: mn.tst_img, labs: mn.tst_lbl, rows, cols };
 
-    //TODO: check ce collate, et check le collate example; minst. 
-    // Collate partiellement appliquée (rows/cols/k/flatten fixés)
+     
     let collate_train = |batch: Vec<(Vec<u8>, u8)>| collate_mnist_xy_u8_to_tensors(batch, rows, cols, 10, true);
     let collate_test  = |batch: Vec<(Vec<u8>, u8)>| collate_mnist_xy_u8_to_tensors(batch, rows, cols, 10, true);
 
